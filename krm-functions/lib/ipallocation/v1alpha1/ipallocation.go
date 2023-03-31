@@ -12,7 +12,7 @@
   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
   See the License for the specific language governing permissions and
   limitations under the License.
-  */
+*/
 
 package v1alpha1
 
@@ -20,10 +20,11 @@ import (
 	"github.com/GoogleContainerTools/kpt-functions-sdk/go/fn"
 	ipamv1alpha1 "github.com/nokia/k8s-ipam/apis/ipam/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/yaml"
 	"sigs.k8s.io/kustomize/kyaml/kio/filters"
+	"sigs.k8s.io/yaml"
 )
 
+// IPAllocation interface will refer to all go-functions this library supports
 type IPAllocation interface {
 	ParseKubeObject() (*fn.KubeObject, error)
 }
@@ -42,6 +43,8 @@ type ipalloc struct {
 	spec ipamv1alpha1.IPAllocationSpec
 }
 
+// ParseKubeObject function takes IPallocation/Spec/metadata and returns IPAllocation as KubeObject
+// with metadata.annotations.config.kubernetes.io/local-config set as true
 func (r *ipalloc) ParseKubeObject() (*fn.KubeObject, error) {
 	if len(r.meta.Annotations) == 0 {
 		r.meta.Annotations = map[string]string{}
