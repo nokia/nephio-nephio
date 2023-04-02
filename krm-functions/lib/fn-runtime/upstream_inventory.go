@@ -22,6 +22,7 @@ type UpstreamInventoryDiff struct {
 	CreateObjs       []*Object
 	DeleteConditions []*Object
 	CreateConditions []*Object
+	UpdateConditions []*Object
 }
 
 type Object struct {
