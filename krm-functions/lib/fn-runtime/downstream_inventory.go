@@ -108,7 +108,7 @@ func (r *downstreamInventory) GetReadinessStatus() map[string]*ReadyCtx {
 		for objRef, invCtx := range ref.resources {
 			// not all resources have a condition set e.g. interface
 			//
-			if invCtx.condition != nil && invCtx.condition.Status == kptv1.ConditionFalse {
+			if invCtx.condition == nil || (invCtx.condition != nil && invCtx.condition.Status == kptv1.ConditionFalse) {
 				readyMap[name].Ready = false
 				break
 			}
