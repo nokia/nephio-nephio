@@ -1,6 +1,8 @@
 package fnruntime
 
 import (
+	"sync"
+
 	"github.com/GoogleContainerTools/kpt-functions-sdk/go/fn"
 	kptv1 "github.com/GoogleContainerTools/kpt/pkg/api/kptfile/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -22,6 +24,7 @@ func NewDownstreamInventory() DownstreamInventory {
 }
 
 type downstreamInventory struct {
+	m sync.RWMutex
 	namedResources map[string]*downstreamResources
 }
 
@@ -37,6 +40,8 @@ type downstreamInventoryCtx struct {
 }
 
 func (r *downstreamInventory) AddCondition(name string, resource *corev1.ObjectReference, c *kptv1.Condition) {
+	r.m.Lock()
+	defer r.m.Unlock() 
 	if _, ok := r.namedResources[name]; !ok {
 		r.namedResources[name] = &downstreamResources{
 			resources: map[corev1.ObjectReference]*downstreamInventoryCtx{},
@@ -49,6 +54,8 @@ func (r *downstreamInventory) AddCondition(name string, resource *corev1.ObjectR
 }
 
 func (r *downstreamInventory) AddResource(name string, resource *corev1.ObjectReference, o *fn.KubeObject) {
+	r.m.Lock()
+	defer r.m.Unlock() 
 	if _, ok := r.namedResources[name]; !ok {
 		r.namedResources[name] = &downstreamResources{
 			resources: map[corev1.ObjectReference]*downstreamInventoryCtx{},
@@ -61,6 +68,8 @@ func (r *downstreamInventory) AddResource(name string, resource *corev1.ObjectRe
 }
 
 func (r *downstreamInventory) AddForCondition(name string, c *kptv1.Condition) {
+	r.m.Lock()
+	defer r.m.Unlock() 
 	if _, ok := r.namedResources[name]; !ok {
 		r.namedResources[name] = &downstreamResources{
 			resources: map[corev1.ObjectReference]*downstreamInventoryCtx{},
@@ -70,6 +79,8 @@ func (r *downstreamInventory) AddForCondition(name string, c *kptv1.Condition) {
 }
 
 func (r *downstreamInventory) AddForResource(name string, o *fn.KubeObject) {
+	r.m.Lock()
+	defer r.m.Unlock() 
 	if _, ok := r.namedResources[name]; !ok {
 		r.namedResources[name] = &downstreamResources{
 			resources: map[corev1.ObjectReference]*downstreamInventoryCtx{},
@@ -79,6 +90,8 @@ func (r *downstreamInventory) AddForResource(name string, o *fn.KubeObject) {
 }
 
 func (r *downstreamInventory) GetForConditionStatus(name string) bool {
+	r.m.RLock()
+	defer r.m.RUnlock() 
 	c, ok := r.namedResources[name]
 	if !ok {
 		// this should not happen
@@ -88,6 +101,8 @@ func (r *downstreamInventory) GetForConditionStatus(name string) bool {
 }
 
 func (r *downstreamInventory) GetReadinessStatus() map[string]*ReadyCtx {
+	r.m.RLock()
+	defer r.m.RUnlock() 
 	readyMap := map[string]*ReadyCtx{}
 	for name, ref := range r.namedResources {
 		readyMap[name] = &ReadyCtx{

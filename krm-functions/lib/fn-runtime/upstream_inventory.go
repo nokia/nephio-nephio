@@ -2,6 +2,7 @@ package fnruntime
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/GoogleContainerTools/kpt-functions-sdk/go/fn"
 	kptv1 "github.com/GoogleContainerTools/kpt/pkg/api/kptfile/v1"
@@ -37,6 +38,7 @@ func NewUpstreamInventory() UpstreamInventory {
 }
 
 type upstreamInventory struct {
+	m sync.RWMutex
 	resources map[corev1.ObjectReference]*upstreamInventoryCtx
 }
 
@@ -47,6 +49,8 @@ type upstreamInventoryCtx struct {
 }
 
 func (r *upstreamInventory) AddExistingCondition(ref *corev1.ObjectReference, c *kptv1.Condition) {
+	r.m.Lock()
+	defer r.m.Unlock() 
 	if _, ok := r.resources[*ref]; !ok {
 		r.resources[*ref] = &upstreamInventoryCtx{}
 	}
@@ -55,6 +59,8 @@ func (r *upstreamInventory) AddExistingCondition(ref *corev1.ObjectReference, c 
 }
 
 func (r *upstreamInventory) AddExistingResource(ref *corev1.ObjectReference, o *fn.KubeObject) {
+	r.m.Lock()
+	defer r.m.Unlock() 
 	if _, ok := r.resources[*ref]; !ok {
 		r.resources[*ref] = &upstreamInventoryCtx{}
 	}
@@ -62,6 +68,8 @@ func (r *upstreamInventory) AddExistingResource(ref *corev1.ObjectReference, o *
 }
 
 func (r *upstreamInventory) AddNewResource(ref *corev1.ObjectReference, o *fn.KubeObject) {
+	r.m.Lock()
+	defer r.m.Unlock() 
 	if _, ok := r.resources[*ref]; !ok {
 		r.resources[*ref] = &upstreamInventoryCtx{}
 	}
@@ -69,6 +77,8 @@ func (r *upstreamInventory) AddNewResource(ref *corev1.ObjectReference, o *fn.Ku
 }
 
 func (r *upstreamInventory) Diff() (UpstreamInventoryDiff, error) {
+	r.m.RLock()
+	defer r.m.RUnlock() 
 	diff := UpstreamInventoryDiff{
 		DeleteObjs:       []*Object{},
 		UpdateObjs:       []*Object{},
