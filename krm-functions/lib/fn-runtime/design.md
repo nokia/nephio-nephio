@@ -1,29 +1,29 @@
 # fn-runtime
 
-The fn-runtime Project is a set of go libraries for building Kpt functions/controllers that are part of a "`Condition` choreography" also called a "`Condition` dance.
+The fn-runtime project is a set of go libraries for building Kpt functions/controllers that are part of a "`Condition` choreography" also called a "`Condition` dance.
 
-The "`Condition` choreography/dance" is a set of kpt function and controllers that perform independent actions on a kpt package. Together and in harmony a declaritive outcome is achieved on a kpt package (a set of KRM resources).
+The "`Condition` choreography/dance" is a set of kpt function and controllers that perform independent actions on a kpt package. Together and in harmony a declarative outcome is achieved on a kpt package (a set of KRM resources).
 
-When comparing the conditional dance with a regular kubernetes controller built upon the controller runtime, we can make a number of analogies.
-- The event driven nature on a For object in the controller runtime is taken by porch, which periodically present the functions/controllers the latest status of the package. The fn/controllers provide an indepempodent operation on the package based on the resource presented.
+When comparing the conditional dance with a regular Kubernetes controller built upon the controller runtime, we can make a number of analogies.
+- The event driven nature on a For object in the controller runtime is taken by Porch, which periodically presents the functions/controllers with the latest status of the package. The fn/controllers provide an idempotent operation on the package based on the resource presented.
 - The fn runtime presents For/Own/Watch resources that have a similar meaning in the fn-runtime as the controller runtime
-    - For: the parent krm resource the fn-runtime operates on
-    - Own: child resources which lifecycle is influenced by the parent resource or the parent resource depend upon
+    - For: the parent KRM resource the fn-runtime operates on
+    - Own: child resources which lifecycle is influenced by the parent resource or the parent resource depends upon
     - Watch: extra resources relevant for the fn to operate on
 - Garbage collecion/owner reference is implemented in the fn-runtime using an annotation with owner key
-- Delete and finalizers are implemented using an annotiation and the delete operation is always performed by the downstream function.
+- Delete and finalizers are implemented using an annotation and the delete operation is always performed by the downstream function.
 
 Conditions are used to signal work from one fn/controller to another and are acted upon in a choreography/dance.
 
-The fn runtime split the implementation is 2 distinct runtimes. The upstream fn-runtime and downstream fn-runtime. 
+The fn runtime splits the implementation is two distinct runtimes. The upstream fn-runtime and downstream fn-runtime. 
 
 ## upstream fn-runtime
 
 An upstream fn-runtime provides lifecycle on child resources (owns) based on a parent resource (for)
 
-Adjacent resources (watch) can be used to influence the behavior the function executes. E.g. is a relevant resource is missing it can trigger a garbage collection operation which deletes all resources based on a certain owner reference.
+Adjacent resources (watch) can be used to influence the behavior the function executes. For example, if a relevant resource is missing it can trigger a garbage collection operation which deletes all resources based on a certain owner reference.
 
-In the Upstream fn-runtime we implemented 2 types of child resources (owns); upstream and downstream child resources.
+In the upstream fn-runtime we implemented 2 types of child resources (owns); upstream and downstream child resources.
 - Upstream child resources have all the knowledge to perform a full lifecycle (CRUD) of the resource. Create and Updates are performed in the upstream fn/controller
 - Downstream child resources rely on other information before a full lifecycle can be performed. Create and updates are performed in the downstream fn/controller.
 
