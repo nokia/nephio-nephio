@@ -53,13 +53,17 @@ func (r *downstreamInventory) AddCondition(name string, resource *corev1.ObjectR
 	r.namedResources[name].resources[*resource].condition = c
 }
 
+func (r *downstreamInventory) initDownstreamResources(name string) {
+	r.namedResources[name] = &downstreamResources{
+		resources: map[corev1.ObjectReference]*downstreamInventoryCtx{},
+	}
+}
+
 func (r *downstreamInventory) AddResource(name string, resource *corev1.ObjectReference, o *fn.KubeObject) {
 	r.m.Lock()
 	defer r.m.Unlock() 
 	if _, ok := r.namedResources[name]; !ok {
-		r.namedResources[name] = &downstreamResources{
-			resources: map[corev1.ObjectReference]*downstreamInventoryCtx{},
-		}
+		r.initDownstreamResources(name)
 	}
 	if r.namedResources[name].resources[*resource] == nil {
 		r.namedResources[name].resources[*resource] = &downstreamInventoryCtx{}
@@ -71,9 +75,7 @@ func (r *downstreamInventory) AddForCondition(name string, c *kptv1.Condition) {
 	r.m.Lock()
 	defer r.m.Unlock() 
 	if _, ok := r.namedResources[name]; !ok {
-		r.namedResources[name] = &downstreamResources{
-			resources: map[corev1.ObjectReference]*downstreamInventoryCtx{},
-		}
+		r.initDownstreamResources(name)
 	}
 	r.namedResources[name].forCondition = *c
 }
@@ -82,9 +84,7 @@ func (r *downstreamInventory) AddForResource(name string, o *fn.KubeObject) {
 	r.m.Lock()
 	defer r.m.Unlock() 
 	if _, ok := r.namedResources[name]; !ok {
-		r.namedResources[name] = &downstreamResources{
-			resources: map[corev1.ObjectReference]*downstreamInventoryCtx{},
-		}
+		r.initDownstreamResources(name)
 	}
 	r.namedResources[name].forObj = o
 }
