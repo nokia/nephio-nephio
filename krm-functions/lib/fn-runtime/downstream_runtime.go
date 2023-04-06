@@ -156,10 +156,10 @@ func (r *downstreamFnRuntime) update() {
 				if delete {
 					kf.DeleteCondition(readyCtx.ForCondition.Type)
 				} else {
+					readyCtx.ForCondition.Status = kptv1.ConditionFalse
 					readyCtx.ForCondition.Message = "Resource Not ready"
 					kf.SetConditions(readyCtx.ForCondition)
 				}
-				
 			}
 		}
 	}

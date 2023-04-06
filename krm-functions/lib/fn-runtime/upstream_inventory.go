@@ -38,7 +38,7 @@ func NewUpstreamInventory() UpstreamInventory {
 }
 
 type upstreamInventory struct {
-	m sync.RWMutex
+	m         sync.RWMutex
 	resources map[corev1.ObjectReference]*upstreamInventoryCtx
 }
 
@@ -50,7 +50,7 @@ type upstreamInventoryCtx struct {
 
 func (r *upstreamInventory) AddExistingCondition(ref *corev1.ObjectReference, c *kptv1.Condition) {
 	r.m.Lock()
-	defer r.m.Unlock() 
+	defer r.m.Unlock()
 	if _, ok := r.resources[*ref]; !ok {
 		r.resources[*ref] = &upstreamInventoryCtx{}
 	}
@@ -60,7 +60,7 @@ func (r *upstreamInventory) AddExistingCondition(ref *corev1.ObjectReference, c 
 
 func (r *upstreamInventory) AddExistingResource(ref *corev1.ObjectReference, o *fn.KubeObject) {
 	r.m.Lock()
-	defer r.m.Unlock() 
+	defer r.m.Unlock()
 	if _, ok := r.resources[*ref]; !ok {
 		r.resources[*ref] = &upstreamInventoryCtx{}
 	}
@@ -69,16 +69,23 @@ func (r *upstreamInventory) AddExistingResource(ref *corev1.ObjectReference, o *
 
 func (r *upstreamInventory) AddNewResource(ref *corev1.ObjectReference, o *fn.KubeObject) {
 	r.m.Lock()
-	defer r.m.Unlock() 
+	defer r.m.Unlock()
 	if _, ok := r.resources[*ref]; !ok {
 		r.resources[*ref] = &upstreamInventoryCtx{}
 	}
 	r.resources[*ref].newResource = o
 }
 
+// Diff is based on the following principle: we have an inventory
+// populated with the existing resource/condition info and we also
+// have information on new resource/condition that would be created
+// if nothinf existed.
+// the diff compares these the eixisiting resource/condition inventory
+// agsinst the new resource/condition inventory and provide CRUD operation
+// based on the comparisons.
 func (r *upstreamInventory) Diff() (UpstreamInventoryDiff, error) {
 	r.m.RLock()
-	defer r.m.RUnlock() 
+	defer r.m.RUnlock()
 	diff := UpstreamInventoryDiff{
 		DeleteObjs:       []*Object{},
 		UpdateObjs:       []*Object{},
@@ -88,19 +95,28 @@ func (r *upstreamInventory) Diff() (UpstreamInventoryDiff, error) {
 	}
 
 	for ref, invCtx := range r.resources {
+		// condition CRUD handling
 		switch {
+		// if there is no new resource, but we have a condition for that resource we should delete the condition
 		case invCtx.newResource == nil && invCtx.existingCondition != nil:
 			diff.DeleteConditions = append(diff.DeleteConditions, &Object{Ref: ref})
+		// if there is a new resource, but we have no condition for that resource someone deleted it
+		// and we have to recreate that condition
 		case invCtx.newResource != nil && invCtx.existingCondition == nil:
 			diff.CreateConditions = append(diff.CreateConditions, &Object{Ref: ref, Obj: *invCtx.newResource})
 		}
+		// resource handling
 		switch {
+		// if the existing resource does not exist but the new resource exist we have to create the new resource
 		case invCtx.existingResource == nil && invCtx.newResource != nil:
 			// create resource
 			diff.CreateObjs = append(diff.CreateObjs, &Object{Ref: ref, Obj: *invCtx.newResource})
+		// if the new resource does not exist and but the resource exist we have to delete the exisiting resource
 		case invCtx.existingResource != nil && invCtx.newResource == nil:
 			// delete resource
 			diff.DeleteObjs = append(diff.DeleteObjs, &Object{Ref: ref, Obj: *invCtx.existingResource})
+		// if both exisiting/new resource exists check the differences of the spec
+		// dependening on the outcome update the resource with the new information 
 		case invCtx.existingResource != nil && invCtx.newResource != nil:
 			// check diff
 			existingSpec, ok, err := invCtx.existingResource.NestedStringMap("spec")
