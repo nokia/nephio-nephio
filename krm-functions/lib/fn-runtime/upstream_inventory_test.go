@@ -144,21 +144,6 @@ func TestDiffWithSpecToDelete(t *testing.T) {
 		byteStream, _ := yaml.Marshal(ipa)
 		kubeObjectMade, _ := fn.ParseKubeObject(byteStream)
 		inventory.AddExistingResource(currentGVKN, kubeObjectMade)
-
-		ipa = &nadv1.NetworkAttachmentDefinition{
-			TypeMeta: metav1.TypeMeta{
-				APIVersion: tt.input.apiVersion,
-				Kind:       tt.input.kind,
-			},
-			ObjectMeta: metav1.ObjectMeta{
-				Name: tt.input.name,
-			},
-			Spec: nadv1.NetworkAttachmentDefinitionSpec{
-				Config: "type2",
-			},
-		}
-		byteStream, _ = yaml.Marshal(ipa)
-		kubeObjectMade, _ = fn.ParseKubeObject(byteStream)
 	}
 	diffList, _ := inventory.Diff()
 	if len(diffList.CreateObjs) != 0 {
@@ -516,21 +501,6 @@ func TestDiffWithSpecToDeleteCondition(t *testing.T) {
 			Message: tt.input.dummy,
 		})
 		inventory.AddExistingResource(currentGVKN, kubeObjectMade)
-
-		ipa = &nadv1.NetworkAttachmentDefinition{
-			TypeMeta: metav1.TypeMeta{
-				APIVersion: tt.input.apiVersion,
-				Kind:       tt.input.kind,
-			},
-			ObjectMeta: metav1.ObjectMeta{
-				Name: tt.input.name,
-			},
-			Spec: nadv1.NetworkAttachmentDefinitionSpec{
-				Config: "type2",
-			},
-		}
-		byteStream, _ = yaml.Marshal(ipa)
-		kubeObjectMade, _ = fn.ParseKubeObject(byteStream)
 	}
 	diffList, _ := inventory.Diff()
 	if len(diffList.DeleteConditions) != 2 {
