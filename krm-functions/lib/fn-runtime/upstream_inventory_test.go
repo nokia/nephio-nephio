@@ -205,7 +205,7 @@ func TestDiffWithSpecToAdd(t *testing.T) {
 		},
 	}
 	for _, tt := range test1 {
-		currentGVKN := &corev1.ObjectReference{
+		newGVKN := &corev1.ObjectReference{
 			APIVersion:      tt.input.apiVersion,
 			Kind:            tt.input.kind,
 			Name:            tt.input.name,
@@ -227,22 +227,7 @@ func TestDiffWithSpecToAdd(t *testing.T) {
 		}
 		byteStream, _ := yaml.Marshal(ipa)
 		kubeObjectMade, _ := fn.ParseKubeObject(byteStream)
-
-		ipa = &nadv1.NetworkAttachmentDefinition{
-			TypeMeta: metav1.TypeMeta{
-				APIVersion: tt.input.apiVersion,
-				Kind:       tt.input.kind,
-			},
-			ObjectMeta: metav1.ObjectMeta{
-				Name: tt.input.name,
-			},
-			Spec: nadv1.NetworkAttachmentDefinitionSpec{
-				Config: "type2",
-			},
-		}
-		byteStream, _ = yaml.Marshal(ipa)
-		kubeObjectMade, _ = fn.ParseKubeObject(byteStream)
-		inventory.AddNewResource(currentGVKN, kubeObjectMade)
+		inventory.AddNewResource(newGVKN, kubeObjectMade)
 	}
 	diffList, _ := inventory.Diff()
 	if len(diffList.CreateObjs) != 2 {
