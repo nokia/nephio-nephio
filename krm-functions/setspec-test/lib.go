@@ -52,33 +52,55 @@ func SetSpec[T any](obj *fn.KubeObject, newSpec *T) error {
 			return fmt.Errorf("unhandled kind %s for %q field", newSpecVal.Kind(), specFieldName)
 		}
 		oldSpecVal := reflect.ValueOf(oldSpec)
-		if newSpecVal.Type() != oldSpecVal.Type() {
-			panic("logical error: type mismatch somewhere it shouldn't happen")
-		}
-
-		for i, n := 0, newSpecVal.NumField(); i < n; i++ {
-			fieldName := GetJsonName(newSpecVal.Type().Field(i))
-			if fieldName == "" {
-				continue
-			}
-
-			fieldNewVal := newSpecVal.Field(i)
-			fieldOldVal := oldSpecVal.Field(i)
-
-			// TODO: if val.Kind() == Struct: do it recursively
-			if fieldNewVal.Kind() == reflect.String {
-				// SetNestedField() doesn't handle enums correctly
-				specObj.SetNestedString(fieldNewVal.String(), fieldName)
-			} else {
-				if !reflect.DeepEqual(fieldOldVal.Interface(), fieldNewVal.Interface()) {
-					specObj.SetNestedField(fieldNewVal.Interface(), fieldName)
-				}
-			}
-		}
-		return nil
+		return setStructFields(specObj, newSpecVal, oldSpecVal)
 	}()
 	if err != nil {
 		return fmt.Errorf("unable to set %q field of K8s resource %v/%v with error: %w", specFieldName, obj.GetKind(), obj.GetName(), err)
+	}
+	return nil
+}
+
+// setStructFields applies the value `newStructVal` to `obj`, but only overwrites the fields
+// that are different than `oldStructVal`'s
+func setStructFields(obj *fn.SubObject, newStructVal, oldStructVal reflect.Value) error {
+	if newStructVal.Type() != oldStructVal.Type() {
+		panic("logical error: type mismatch somewhere it shouldn't happen")
+	}
+
+	for i, n := 0, newStructVal.NumField(); i < n; i++ {
+		fieldName := GetJsonName(newStructVal.Type().Field(i))
+		if fieldName == "" {
+			continue
+		}
+
+		fieldNewVal := newStructVal.Field(i)
+		fieldOldVal := oldStructVal.Field(i)
+
+		if reflect.DeepEqual(fieldOldVal.Interface(), fieldNewVal.Interface()) {
+			continue
+		}
+		if fieldNewVal.Kind() == reflect.String {
+			// SetNestedField() doesn't handle enums correctly
+			obj.SetNestedString(fieldNewVal.String(), fieldName)
+			continue
+		}
+		if (fieldNewVal.Kind() == reflect.Ptr) &&
+			!fieldNewVal.IsNil() &&
+			!fieldOldVal.IsNil() {
+			fieldNewVal = fieldNewVal.Elem()
+			fieldOldVal = fieldOldVal.Elem()
+		}
+		if fieldNewVal.Kind() == reflect.Struct {
+			err := setStructFields(obj.GetMap(fieldName), fieldNewVal, fieldOldVal)
+			if err != nil {
+				return err
+			}
+			continue
+		}
+		err := obj.SetNestedField(fieldNewVal.Interface(), fieldName)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }

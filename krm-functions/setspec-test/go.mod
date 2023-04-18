@@ -6,6 +6,7 @@ require (
 	github.com/GoogleContainerTools/kpt-functions-sdk/go/fn v0.0.0-20230302070146-e8e9cb3c3ae2
 	github.com/nephio-project/api v0.0.0-20230413172718-21afbeeb1a54
 	github.com/nephio-project/nephio v0.0.0-00010101000000-000000000000
+	github.com/nokia/k8s-ipam v0.0.3
 )
 
 replace github.com/nephio-project/nephio => ../..

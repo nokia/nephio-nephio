@@ -97,6 +97,8 @@ github.com/monochromegane/go-gitignore v0.0.0-20200626010858-205db1a8cc00 h1:n6/
 github.com/monochromegane/go-gitignore v0.0.0-20200626010858-205db1a8cc00/go.mod h1:Pm3mSP3c5uWn86xMLZ5Sa7JB9GsEZySvHYXCTK4E9q4=
 github.com/nephio-project/api v0.0.0-20230413172718-21afbeeb1a54 h1:3WJyRzoUSWdZxPKf4w2zHkIhDaQcuaZKBAzM6UcIw50=
 github.com/nephio-project/api v0.0.0-20230413172718-21afbeeb1a54/go.mod h1:bnSvfnwZqYSnaxfxztf4KVKuyyZK2VY4gKQp2yYt2Mo=
+github.com/nokia/k8s-ipam v0.0.3 h1:OhWS0/gwB6/SZgOqo2iykaAYPi9sPkYzQaC/OB+yMnw=
+github.com/nokia/k8s-ipam v0.0.3/go.mod h1:2DhUly1e6shv5YjbNwiL0uXg3Qlq4jUEj5NoS59P6/o=
 github.com/onsi/ginkgo/v2 v2.6.0 h1:9t9b9vRUbFq3C4qKFCGkVuq/fIHji802N1nrtkh1mNc=
 github.com/onsi/gomega v1.24.1 h1:KORJXNNTzJXzu4ScJWssJfJMnJ+2QJqhoQSRwNlze9E=
 github.com/pkg/errors v0.9.1 h1:FEBLx1zS214owpjy7qsBeixbURkuhQAwrK5UwLGTwt4=

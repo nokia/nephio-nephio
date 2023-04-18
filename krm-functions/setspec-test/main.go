@@ -21,6 +21,7 @@ import (
 	"github.com/GoogleContainerTools/kpt-functions-sdk/go/fn"
 	nf "github.com/nephio-project/api/nf_requirements/v1alpha1"
 	iflib "github.com/nephio-project/nephio/krm-functions/lib/interface/v1alpha1"
+	ipamv1alpha1 "github.com/nokia/k8s-ipam/apis/ipam/v1alpha1"
 )
 
 var _ fn.Runner = &SetSpecFn{}
@@ -90,6 +91,28 @@ func (r *SetSpecFn) Run(ctx *fn.Context, functionConfig *fn.KubeObject, items fn
 			// - naturally SetSpec() should be generalized and used for Status, as well
 
 		}
+	}
+
+	// process IPAllocations for real tests
+	for _, obj := range items.Where(fn.IsGroupVersionKind(ipamv1alpha1.IPAllocationGroupVersionKind)) {
+		// read the Interface into the API go struct
+		var ipalloc ipamv1alpha1.IPAllocation
+		err := obj.As(&ipalloc)
+		if err != nil {
+			results.ErrorE(err)
+			return false
+		}
+
+		// manipulate the go struct
+		// ipalloc.Spec.NetworkInstance.
+
+		// write back changes in "Spec" to the KubeObject, keeping the comments
+		err = SetSpec(obj, &ipalloc.Spec)
+		if err != nil {
+			results.ErrorE(err)
+			return false
+		}
+
 	}
 
 	return true
