@@ -6,6 +6,24 @@ items:
   # comment
   kind: Interface
   metadata: # comment
+    name: currentsdk # comment
+    # comment
+    annotations:
+      config.kubernetes.io/local-config: "true" # comment
+  # comment
+  spec: # comment
+    # comment
+    networkInstance: # comment
+      name: vpc-ran # comment
+    # comment
+    cniType: ipvlan # comment
+    # comment
+    attachmentType: vlan # comment
+- # comment
+  apiVersion: req.nephio.org/v1alpha1 # comment
+  # comment
+  kind: Interface
+  metadata: # comment
     name: setspec # comment
     # comment
     annotations:
@@ -16,7 +34,7 @@ items:
     networkInstance: # comment
       name: vpc-ran # comment
     # comment
-    cniType: test # comment
+    cniType: ipvlan # comment
     # comment
     attachmentType: vlan # comment
 results:
