@@ -1,0 +1,18 @@
+apiVersion: kpt.dev/v1
+kind: Kptfile
+metadata:
+  name: setspec-test
+upstream:
+  type: git
+  git:
+    repo: https://github.com/GoogleContainerTools/kpt-functions-sdk
+    directory: /go/get-started
+    ref: master
+  updateStrategy: resource-merge
+upstreamLock:
+  type: git
+  git:
+    repo: https://github.com/GoogleContainerTools/kpt-functions-sdk
+    directory: /go/get-started
+    ref: master
+    commit: e8e9cb3c3ae2a19c22f52701d1542cf24e541df0

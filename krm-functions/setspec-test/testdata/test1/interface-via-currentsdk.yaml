@@ -1,0 +1,23 @@
+# comment
+
+# comment
+apiVersion: req.nephio.org/v1alpha1 # comment
+# comment
+kind: Interface
+metadata: # comment
+  name: currentsdk # comment
+
+  # comment
+  annotations:
+    config.kubernetes.io/local-config: "true" # comment
+# comment
+spec: # comment
+  
+  # comment
+  networkInstance: # comment
+    name: vpc-ran # comment
+
+  # comment
+  cniType: sriov # comment
+  # comment
+  attachmentType: vlan # comment

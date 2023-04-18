@@ -1,0 +1,24 @@
+apiVersion: config.kubernetes.io/v1
+kind: ResourceList
+items:
+- # comment
+  apiVersion: req.nephio.org/v1alpha1 # comment
+  # comment
+  kind: Interface
+  metadata: # comment
+    name: setspec # comment
+    # comment
+    annotations:
+      config.kubernetes.io/local-config: "true" # comment
+  # comment
+  spec: # comment
+    # comment
+    networkInstance: # comment
+      name: vpc-ran # comment
+    # comment
+    cniType: test # comment
+    # comment
+    attachmentType: vlan # comment
+results:
+- message: '`FunctionConfig` is not given'
+  severity: info
