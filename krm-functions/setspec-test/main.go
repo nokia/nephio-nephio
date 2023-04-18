@@ -79,14 +79,14 @@ func (r *SetSpecFn) Run(ctx *fn.Context, functionConfig *fn.KubeObject, items fn
 			// Reason to change:
 			//   No need to create an interface for each K8s resource and 3 methods for each resource field,
 			//   and keep the interface and the API go struct in sync later
-			//
+
 			// Notes:
-			// - this proposal is almost eqvivalent in terms of keeping the comments with the current SDK
+			// - this proposal is almost equivalent in terms of keeping the comments with the current SDK
 			// - both versions will keep all comments in Release 1 supported scenarios
 			// - the implementation of SetSpec() is a temporary fix, the proper place to implement this is here:
 			//    https://github.com/GoogleContainerTools/kpt-functions-sdk/blob/e8e9cb3c3ae2a19c22f52701d1542cf24e541df0/go/fn/internal/map.go#L138
 			//   at the line that reads: "// TODO: Copy comments?"  :))
-			//   Unfortunatelly different CLA (+ my company's policy) prevents me to contribute there
+			//   Unfortunately different CLA (+ my company's policy) prevents me to contribute there
 			// - naturally SetSpec() should be generalized and used for Status, as well
 
 		}
