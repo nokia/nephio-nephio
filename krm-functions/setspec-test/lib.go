@@ -17,9 +17,7 @@
 package main
 
 import (
-	"fmt"
 	"reflect"
-	"strings"
 	"unsafe"
 
 	"github.com/GoogleContainerTools/kpt-functions-sdk/go/fn"
@@ -43,7 +41,8 @@ func SetNestedFieldKeepingComments(obj *fn.SubObject, value interface{}, field s
 	newNode := yamlNodeOf(obj.GetMap(field))
 
 	RestoreFieldOrder(oldNode, newNode)
-	return DeepCopyComments(oldNode, newNode)
+	DeepCopyComments(oldNode, newNode)
+	return nil
 }
 
 func ShallowCopyComments(src, dst *yaml.Node) {
@@ -52,19 +51,17 @@ func ShallowCopyComments(src, dst *yaml.Node) {
 	dst.FootComment = src.FootComment
 }
 
-func DeepCopyComments(src, dst *yaml.Node) error {
+func DeepCopyComments(src, dst *yaml.Node) {
 	if src.Kind != dst.Kind {
-		return nil
+		return
 	}
 	ShallowCopyComments(src, dst)
 	if dst.Kind == yaml.MappingNode {
-		children := dst.Content
-		if len(children)%2 != 0 {
+		if (len(src.Content)%2 != 0) || (len(dst.Content)%2 != 0) {
 			panic("unexpected number of children for YAML map")
 		}
-
-		for i := 0; i < len(children); i += 2 {
-			dstKeyNode := children[i]
+		for i := 0; i < len(dst.Content); i += 2 {
+			dstKeyNode := dst.Content[i]
 			key, ok := asString(dstKeyNode)
 			if !ok {
 				continue
@@ -75,16 +72,11 @@ func DeepCopyComments(src, dst *yaml.Node) error {
 				continue
 			}
 			srcKeyNode, srcValueNode := src.Content[j], src.Content[j+1]
-			dstValueNode := children[i+1]
+			dstValueNode := dst.Content[i+1]
 			ShallowCopyComments(srcKeyNode, dstKeyNode)
-			err := DeepCopyComments(srcValueNode, dstValueNode)
-			if err != nil {
-				return err
-			}
+			DeepCopyComments(srcValueNode, dstValueNode)
 		}
-
 	}
-	return nil
 }
 
 func RestoreFieldOrder(src, dst *yaml.Node) {
@@ -112,7 +104,7 @@ func RestoreFieldOrder(src, dst *yaml.Node) {
 		}
 		nextInDst += 2
 
-		srcValueNode := children[i+1]
+		srcValueNode := src.Content[i+1]
 		dstValueNode := dst.Content[nextInDst-1]
 		RestoreFieldOrder(srcValueNode, dstValueNode)
 	}
@@ -146,103 +138,4 @@ func yamlNodeOf(obj *fn.SubObject) *yaml.Node {
 	nodePtr := internalObj.Elem().FieldByName("node")
 	nodePtr = reflect.NewAt(nodePtr.Type(), unsafe.Pointer(nodePtr.UnsafeAddr())).Elem()
 	return nodePtr.Interface().(*yaml.Node)
-}
-
-func SetSpec1stTry[T any](obj *fn.KubeObject, newSpec *T) error {
-	specFieldName := "spec"
-	err := func() error {
-		if newSpec == nil {
-			return fmt.Errorf("the passed-in object must not be nil")
-		}
-		if obj == nil {
-			return fmt.Errorf("the object doesn't exist")
-		}
-		specObj := obj.GetMap(specFieldName)
-		if specObj == nil {
-			return fmt.Errorf("missing %q field", specFieldName)
-		}
-
-		var oldSpec T
-		err := specObj.As(&oldSpec)
-		if err != nil {
-			return fmt.Errorf("parse error at %q field: %v", specFieldName, err)
-		}
-
-		newSpecVal := reflect.ValueOf(newSpec)
-		if newSpecVal.Kind() == reflect.Ptr {
-			newSpecVal = newSpecVal.Elem()
-		}
-		if newSpecVal.Kind() != reflect.Struct {
-			return fmt.Errorf("unhandled kind %s for %q field", newSpecVal.Kind(), specFieldName)
-		}
-		oldSpecVal := reflect.ValueOf(oldSpec)
-		return setStructFields(specObj, newSpecVal, oldSpecVal)
-	}()
-	if err != nil {
-		return fmt.Errorf("unable to set %q field of K8s resource %v/%v with error: %w", specFieldName, obj.GetKind(), obj.GetName(), err)
-	}
-	return nil
-}
-
-// setStructFields applies the value `newStructVal` to `obj`, but only overwrites the fields
-// that are different than `oldStructVal`'s
-func setStructFields(obj *fn.SubObject, newStructVal, oldStructVal reflect.Value) error {
-	if newStructVal.Type() != oldStructVal.Type() {
-		panic("logical error: type mismatch somewhere it shouldn't happen")
-	}
-
-	for i, n := 0, newStructVal.NumField(); i < n; i++ {
-		fieldName := GetJsonName(newStructVal.Type().Field(i))
-		if fieldName == "" {
-			continue
-		}
-
-		fieldNewVal := newStructVal.Field(i)
-		fieldOldVal := oldStructVal.Field(i)
-
-		if reflect.DeepEqual(fieldOldVal.Interface(), fieldNewVal.Interface()) {
-			continue
-		}
-		if fieldNewVal.Kind() == reflect.String {
-			// SetNestedField() doesn't handle enums correctly
-			obj.SetNestedString(fieldNewVal.String(), fieldName)
-			continue
-		}
-		if (fieldNewVal.Kind() == reflect.Ptr) &&
-			!fieldNewVal.IsNil() &&
-			!fieldOldVal.IsNil() {
-			fieldNewVal = fieldNewVal.Elem()
-			fieldOldVal = fieldOldVal.Elem()
-		}
-		if fieldNewVal.Kind() == reflect.Struct {
-			err := setStructFields(obj.GetMap(fieldName), fieldNewVal, fieldOldVal)
-			if err != nil {
-				return err
-			}
-			continue
-		}
-		err := obj.SetNestedField(fieldNewVal.Interface(), fieldName)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func GetJsonName(field reflect.StructField) string {
-	jsonTag := field.Tag.Get("yaml")
-	if jsonTag == "" {
-		jsonTag = field.Tag.Get("json")
-	}
-
-	switch jsonTag {
-	case "": // missing
-	case "-": // not serialized
-		return ""
-	default:
-		// TODO: handle json:",inline" by recursively calling
-		parts := strings.Split(jsonTag, ",")
-		return parts[0]
-	}
-	return ""
 }
