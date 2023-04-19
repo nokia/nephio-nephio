@@ -68,10 +68,12 @@ func (r *SetSpecFn) Run(ctx *fn.Context, functionConfig *fn.KubeObject, items fn
 			}
 
 			// manipulate the go struct
-			iface.Spec.CNIType = nf.CNITypeIPVLAN
+			iface.Spec.CNIType = ""
+			iface.Spec.NetworkInstance.Name = "test"
+			iface.Spec.NetworkInstance.Kind = "test"
 
 			// write back changes in "Spec" to the KubeObject, keeping the comments
-			err = SetSpec(obj, &iface.Spec)
+			err = SetNestedFieldKeepingComments(&obj.SubObject, &iface.Spec, "spec")
 			if err != nil {
 				results.ErrorE(err)
 				return false

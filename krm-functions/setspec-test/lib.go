@@ -20,11 +20,135 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"unsafe"
 
 	"github.com/GoogleContainerTools/kpt-functions-sdk/go/fn"
+	"sigs.k8s.io/kustomize/kyaml/yaml"
 )
 
-func SetSpec[T any](obj *fn.KubeObject, newSpec *T) error {
+func SetSpec(obj *fn.KubeObject, newSpec interface{}) error {
+	return SetNestedFieldKeepingComments(&obj.SubObject, newSpec, "spec")
+}
+
+func SetStatus(obj *fn.KubeObject, newStatus interface{}) error {
+	return SetNestedFieldKeepingComments(&obj.SubObject, newStatus, "status")
+}
+
+func SetNestedFieldKeepingComments(obj *fn.SubObject, value interface{}, field string) error {
+	oldNode := yamlNodeOf(obj.GetMap(field))
+	err := obj.SetNestedField(value, field)
+	if err != nil {
+		return err
+	}
+	newNode := yamlNodeOf(obj.GetMap(field))
+
+	RestoreFieldOrder(oldNode, newNode)
+	return DeepCopyComments(oldNode, newNode)
+}
+
+func ShallowCopyComments(src, dst *yaml.Node) {
+	dst.HeadComment = src.HeadComment
+	dst.LineComment = src.LineComment
+	dst.FootComment = src.FootComment
+}
+
+func DeepCopyComments(src, dst *yaml.Node) error {
+	if src.Kind != dst.Kind {
+		return nil
+	}
+	ShallowCopyComments(src, dst)
+	if dst.Kind == yaml.MappingNode {
+		children := dst.Content
+		if len(children)%2 != 0 {
+			panic("unexpected number of children for YAML map")
+		}
+
+		for i := 0; i < len(children); i += 2 {
+			dstKeyNode := children[i]
+			key, ok := asString(dstKeyNode)
+			if !ok {
+				continue
+			}
+
+			j, ok := findKey(src, key)
+			if !ok {
+				continue
+			}
+			srcKeyNode, srcValueNode := src.Content[j], src.Content[j+1]
+			dstValueNode := children[i+1]
+			ShallowCopyComments(srcKeyNode, dstKeyNode)
+			err := DeepCopyComments(srcValueNode, dstValueNode)
+			if err != nil {
+				return err
+			}
+		}
+
+	}
+	return nil
+}
+
+func RestoreFieldOrder(src, dst *yaml.Node) {
+	if (src.Kind != dst.Kind) || (dst.Kind != yaml.MappingNode) {
+		return
+	}
+	if (len(src.Content)%2 != 0) || (len(dst.Content)%2 != 0) {
+		panic("unexpected number of children for YAML map")
+	}
+
+	nextInDst := 0
+	for i := 0; i < len(src.Content); i += 2 {
+		key, ok := asString(src.Content[i])
+		if !ok {
+			continue
+		}
+
+		j, ok := findKey(dst, key)
+		if !ok {
+			continue
+		}
+		if j != nextInDst {
+			dst.Content[j], dst.Content[nextInDst] = dst.Content[nextInDst], dst.Content[j]
+			dst.Content[j+1], dst.Content[nextInDst+1] = dst.Content[nextInDst+1], dst.Content[j+1]
+		}
+		nextInDst += 2
+
+		srcValueNode := children[i+1]
+		dstValueNode := dst.Content[nextInDst-1]
+		RestoreFieldOrder(srcValueNode, dstValueNode)
+	}
+}
+
+func asString(node *yaml.Node) (string, bool) {
+	if node.Kind == yaml.ScalarNode && (node.Tag == "!!str" || node.Tag == "") {
+		return node.Value, true
+	}
+	return "", false
+}
+
+func findKey(m *yaml.Node, key string) (int, bool) {
+	children := m.Content
+	if len(children)%2 != 0 {
+		panic("unexpected number of children for YAML map")
+	}
+	for i := 0; i < len(children); i += 2 {
+		keyNode := children[i]
+		k, ok := asString(keyNode)
+		if ok && k == key {
+			return i, true
+		}
+	}
+	return 0, false
+}
+
+// This is a temporary workaround until YAML comments (and ordering) are made accessible properly via the official SDK API
+func yamlNodeOf(obj *fn.SubObject) *yaml.Node {
+	internalObj := reflect.ValueOf(*obj).FieldByName("obj")
+	nodePtr := internalObj.Elem().FieldByName("node")
+	nodePtr = reflect.NewAt(nodePtr.Type(), unsafe.Pointer(nodePtr.UnsafeAddr())).Elem()
+	return nodePtr.Interface().(*yaml.Node)
+}
+
+func SetSpec1stTry[T any](obj *fn.KubeObject, newSpec *T) error {
 	specFieldName := "spec"
 	err := func() error {
 		if newSpec == nil {
