@@ -1,0 +1,13 @@
+apiVersion: ipam.nephio.org/v1alpha1
+kind: IPAllocation
+metadata:
+  name: internet-pool1
+  annotations:
+    fnruntime.nephio.org/owner: req.nephio.org/v1alpha1.DataNetwork.internet
+spec: # comment
+  kind: pool # comment
+  networkInstance: vpc-internet # comment
+  prefixLength: 8 # comment
+  labels: # comment
+    key1: value1 # comment
+

@@ -1,0 +1,58 @@
+apiVersion: config.kubernetes.io/v1
+kind: ResourceList
+items:
+- apiVersion: ipam.nephio.org/v1alpha1
+  kind: IPAllocation
+  metadata:
+    name: internet-pool1
+    annotations:
+      fnruntime.nephio.org/owner: req.nephio.org/v1alpha1.DataNetwork.internet
+  spec: # comment
+    kind: pool # comment
+    networkInstance: vpc-internet # comment
+    prefixLength: 8 # comment
+    selector:
+      matchLabels:
+        new-test-label-1: data
+        new-test-label-2: foo
+  status:
+    prefix: 1.1.1.1
+    gateway: 1.1.1.255
+- apiVersion: ipam.nephio.org/v1alpha1 # comment 
+  kind: IPAllocation # comment 
+  metadata: # comment 
+    # comment 
+    creationTimestamp: null
+    name: n3
+    annotations:
+      fnruntime.nephio.org/owner: req.nephio.org/v1alpha1.Interface.n3
+  # comment 
+  spec: # comment 
+    # comment 
+    # comment 
+    # comment 
+    kind: network # comment 
+    # comment 
+
+    # comment 
+
+    # comment 
+    networkInstance: test # comment 
+    # comment
+    selector: # comment 
+      # comment
+      matchLabels: # comment 
+        # comment 
+        # comment 
+        nephio.org/site: edge1 # comment 
+        # comment 
+
+        new-test-label-2: foo
+    labels:
+      new-test-label-3: val
+  status:
+    prefix: 1.1.1.1
+    gateway: 1.1.1.255
+results:
+- message: '`FunctionConfig` is not given'
+  severity: info

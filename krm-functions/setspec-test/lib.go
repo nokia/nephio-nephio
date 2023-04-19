@@ -33,7 +33,7 @@ func SetStatus(obj *fn.KubeObject, newStatus interface{}) error {
 }
 
 func SetNestedFieldKeepingComments(obj *fn.SubObject, value interface{}, field string) error {
-	oldNode := yamlNodeOf(obj.GetMap(field))
+	oldNode := yamlNodeOf(obj.UpsertMap(field))
 	err := obj.SetNestedField(value, field)
 	if err != nil {
 		return err

@@ -24,6 +24,7 @@ import (
 	nf "github.com/nephio-project/api/nf_requirements/v1alpha1"
 	iflib "github.com/nephio-project/nephio/krm-functions/lib/interface/v1alpha1"
 	ipamv1alpha1 "github.com/nokia/k8s-ipam/apis/ipam/v1alpha1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 var _ fn.Runner = &SetSpecFn{}
@@ -56,6 +57,16 @@ func (r *SetSpecFn) Run(ctx *fn.Context, functionConfig *fn.KubeObject, items fn
 				results.ErrorE(err)
 				return false
 			}
+			err = iface.SetNetworkInstanceName("test")
+			if err != nil {
+				results.ErrorE(err)
+				return false
+			}
+			err = iface.DeleteAttachmentType()
+			if err != nil {
+				results.ErrorE(err)
+				return false
+			}
 
 		} else {
 
@@ -70,9 +81,9 @@ func (r *SetSpecFn) Run(ctx *fn.Context, functionConfig *fn.KubeObject, items fn
 			}
 
 			// manipulate the go struct
-			iface.Spec.CNIType = ""
+			iface.Spec.CNIType = nf.CNITypeIPVLAN
 			iface.Spec.NetworkInstance.Name = "test"
-			iface.Spec.NetworkInstance.Kind = "test"
+			iface.Spec.AttachmentType = ""
 
 			// write back changes in "Spec" to the KubeObject, keeping the comments
 			err = SetSpec(obj, &iface.Spec)
@@ -97,7 +108,7 @@ func (r *SetSpecFn) Run(ctx *fn.Context, functionConfig *fn.KubeObject, items fn
 		}
 	}
 
-	// process IPAllocations for real tests
+	// process IPAllocations for further tests
 	for _, obj := range items.Where(fn.IsGroupVersionKind(ipamv1alpha1.IPAllocationGroupVersionKind)) {
 		// read the Interface into the API go struct
 		var ipalloc ipamv1alpha1.IPAllocation
@@ -108,10 +119,34 @@ func (r *SetSpecFn) Run(ctx *fn.Context, functionConfig *fn.KubeObject, items fn
 		}
 
 		// manipulate the go struct
-		// ipalloc.Spec.NetworkInstance.
+		if ipalloc.Spec.Selector == nil {
+			ipalloc.Spec.Selector = &v1.LabelSelector{
+				MatchLabels: map[string]string{
+					"new-test-label-1": "data",
+				},
+			}
+		}
+		ipalloc.Spec.Selector.MatchLabels["new-test-label-2"] = "foo"
+		if len(ipalloc.Spec.Labels) == 0 {
+			ipalloc.Spec.Labels = map[string]string{"new-test-label-3": "val"}
+		} else {
+			for k := range ipalloc.Spec.Labels {
+				delete(ipalloc.Spec.Labels, k)
+			}
+		}
+		ipalloc.Spec.Prefix = "" // "delete" Prefix
 
 		// write back changes in "Spec" to the KubeObject, keeping the comments
 		err = SetSpec(obj, &ipalloc.Spec)
+		if err != nil {
+			results.ErrorE(err)
+			return false
+		}
+
+		// write Status
+		ipalloc.Status.AllocatedPrefix = "1.1.1.1"
+		ipalloc.Status.Gateway = "1.1.1.255"
+		err = SetStatus(obj, &ipalloc.Status)
 		if err != nil {
 			results.ErrorE(err)
 			return false

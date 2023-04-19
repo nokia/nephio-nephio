@@ -14,11 +14,9 @@ items:
   spec: # comment
     # comment
     networkInstance: # comment
-      name: vpc-ran # comment
+      name: test # comment
     # comment
     cniType: ipvlan # comment
-    # comment
-    attachmentType: vlan # comment
 - # comment
   apiVersion: req.nephio.org/v1alpha1 # comment
   # comment
@@ -32,11 +30,9 @@ items:
   spec: # comment
     # comment
     networkInstance: # comment
-      name: vpc-ran # comment
+      name: test # comment
     # comment
     cniType: ipvlan # comment
-    # comment
-    attachmentType: vlan # comment
 results:
 - message: '`FunctionConfig` is not given'
   severity: info

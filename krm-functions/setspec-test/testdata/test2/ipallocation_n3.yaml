@@ -1,0 +1,31 @@
+apiVersion: ipam.nephio.org/v1alpha1 # comment 
+kind: IPAllocation # comment 
+metadata: # comment 
+  # comment 
+  creationTimestamp: null
+  name: n3
+  annotations:
+    fnruntime.nephio.org/owner: req.nephio.org/v1alpha1.Interface.n3
+
+# comment 
+spec: # comment 
+# comment 
+# comment 
+# comment 
+  kind: network # comment 
+  # comment 
+
+  # comment 
+
+  # comment 
+  networkInstance: test # comment 
+  # comment
+  prefix: test
+  # comment
+  selector: # comment 
+  # comment
+    matchLabels: # comment 
+    # comment 
+      # comment 
+      nephio.org/site: edge1 # comment 
+      # comment 
