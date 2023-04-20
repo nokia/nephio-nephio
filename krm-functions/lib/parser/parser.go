@@ -20,7 +20,6 @@ import (
 	"fmt"
 
 	"github.com/GoogleContainerTools/kpt-functions-sdk/go/fn"
-	"sigs.k8s.io/yaml"
 )
 
 const (
@@ -83,11 +82,11 @@ func NewFromYaml[T1 any](b []byte) (Parser[T1], error) {
 // NewFromGoStruct creates a new parser interface
 // It expects a go struct representing the interface krm resource
 func NewFromGoStruct[T1 any](x any) (Parser[T1], error) {
-	b, err := yaml.Marshal(x)
+	o, err := fn.NewFromTypedObject(x)
 	if err != nil {
 		return nil, err
 	}
-	return NewFromYaml[T1](b)
+	return NewFromKubeObject[T1](o), nil
 }
 
 type obj[T1 any] struct {
@@ -102,10 +101,11 @@ func (r *obj[T1]) GetKubeObject() *fn.KubeObject {
 // GetGoStruct returns a go struct representing the present KRM resource
 func (r *obj[T1]) GetGoStruct() (T1, error) {
 	var x T1
-	if err := yaml.Unmarshal([]byte(r.o.String()), &x); err != nil {
-		return x, err
+	if r.o == nil {
+		return x, fmt.Errorf(errKubeObjectNotInitialized)
 	}
-	return x, nil
+	err := r.o.As(&x)
+	return x, err
 }
 
 // GetStringValue is a generic utility function that returns a string from
