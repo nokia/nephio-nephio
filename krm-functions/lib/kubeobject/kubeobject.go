@@ -29,7 +29,7 @@ type KubeObjectExt[T1 any] struct {
 
 func (r *KubeObjectExt[T1]) GetGoStruct() (T1, error) {
 	var x T1
-	if err := yaml.Unmarshal([]byte(r.String()), &x); err != nil {
+	if err := r.As(x); err != nil {
 		return x, err
 	}
 	return x, nil
