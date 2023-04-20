@@ -17,8 +17,6 @@ limitations under the License.
 package parser
 
 import (
-	"fmt"
-
 	"github.com/GoogleContainerTools/kpt-functions-sdk/go/fn"
 	"sigs.k8s.io/yaml"
 )
@@ -65,9 +63,7 @@ type Parser[T1 any] interface {
 // NewFromKubeObject creates a new parser interface
 // It expects a *fn.KubeObject as input representing the serialized yaml file
 func NewFromKubeObject[T1 any](o *fn.KubeObject) Parser[T1] {
-	return &obj[T1]{
-		o: o,
-	}
+	return (*obj[T1])(o)
 }
 
 // NewFromYaml creates a new parser interface
@@ -90,145 +86,75 @@ func NewFromGoStruct[T1 any](x any) (Parser[T1], error) {
 	return NewFromYaml[T1](b)
 }
 
-type obj[T1 any] struct {
-	o *fn.KubeObject
-}
+type obj[T1 any] fn.KubeObject
 
 // GetKubeObject returns the present kubeObject
 func (r *obj[T1]) GetKubeObject() *fn.KubeObject {
-	return r.o
+	return (*fn.KubeObject)(r)
 }
 
 // GetGoStruct returns a go struct representing the present KRM resource
 func (r *obj[T1]) GetGoStruct() (T1, error) {
 	var x T1
-	if err := yaml.Unmarshal([]byte(r.o.String()), &x); err != nil {
-		return x, err
-	}
-	return x, nil
+	err := yaml.Unmarshal([]byte(r.GetKubeObject().String()), &x)
+	return x, err
 }
 
 // GetStringValue is a generic utility function that returns a string from
 // a string slice representing the path in the yaml doc
 func (r *obj[T1]) GetStringValue(fields ...string) string {
-	if r.o == nil {
-		return ""
-	}
-	s, ok, err := r.o.NestedString(fields...)
-	if err != nil {
-		return ""
-	}
-	if !ok {
-		return ""
-	}
+	s, _, _ := r.SubObject.NestedString(fields...)
 	return s
 }
 
 // GetIntValue is a generic utility function that returns a int from
 // a string slice representing the path in the yaml doc
 func (r *obj[T1]) GetIntValue(fields ...string) int {
-	if r.o == nil {
-		return 0
-	}
-	i, ok, err := r.o.NestedInt(fields...)
-	if err != nil {
-		return 0
-	}
-	if !ok {
-		return 0
-	}
+	i, _, _ := r.SubObject.NestedInt(fields...)
 	return i
 }
 
 // GetBoolValue is a generic utility function that returns a bool from
 // a string slice representing the path in the yaml doc
 func (r *obj[T1]) GetBoolValue(fields ...string) bool {
-	if r.o == nil {
-		return false
-	}
-	b, ok, err := r.o.NestedBool(fields...)
-	if err != nil {
-		return false
-	}
-	if !ok {
-		return false
-	}
+	b, _, _ := r.SubObject.NestedBool(fields...)
 	return b
 }
 
 // GetStringMap is a generic utility function that returns a map[string]string from
 // a string slice representing the path in the yaml doc
 func (r *obj[T1]) GetStringMap(fields ...string) map[string]string {
-	if r.o == nil {
-		return map[string]string{}
-	}
-	m, ok, err := r.o.NestedStringMap(fields...)
-	if err != nil {
-		return map[string]string{}
-	}
-	if !ok {
-		return map[string]string{}
-	}
+	m, _, _ := r.SubObject.NestedStringMap(fields...)
 	return m
 }
 
 // SetNestedString is a generic utility function that sets a string on
 // a string slice representing the path in the yaml doc
 func (r *obj[T1]) SetNestedString(s string, fields ...string) error {
-	if r.o == nil {
-		return fmt.Errorf(errKubeObjectNotInitialized)
-	}
-	if err := r.o.SetNestedField(s, fields...); err != nil {
-		return err
-	}
-	return nil
+	return r.SubObject.SetNestedField(s, fields...)
 }
 
 // SetNestedInt is a generic utility function that sets a int on
 // a string slice representing the path in the yaml doc
 func (r *obj[T1]) SetNestedInt(s int, fields ...string) error {
-	if r.o == nil {
-		return fmt.Errorf(errKubeObjectNotInitialized)
-	}
-	if err := r.o.SetNestedInt(s, fields...); err != nil {
-		return err
-	}
-	return nil
+	return r.SubObject.SetNestedInt(s, fields...)
 }
 
 // SetNestedBool is a generic utility function that sets a bool on
 // a string slice representing the path in the yaml doc
 func (r *obj[T1]) SetNestedBool(s bool, fields ...string) error {
-	if r.o == nil {
-		return fmt.Errorf(errKubeObjectNotInitialized)
-	}
-	if err := r.o.SetNestedBool(s, fields...); err != nil {
-		return err
-	}
-	return nil
+	return r.SubObject.SetNestedBool(s, fields...)
 }
 
 // SetNestedMap is a generic utility function that sets a map[string]string on
 // a string slice representing the path in the yaml doc
 func (r *obj[T1]) SetNestedMap(s map[string]string, fields ...string) error {
-	if r.o == nil {
-		return fmt.Errorf(errKubeObjectNotInitialized)
-	}
-	if err := r.o.SetNestedStringMap(s, fields...); err != nil {
-		return err
-	}
-	return nil
+	return r.SubObject.SetNestedStringMap(s, fields...)
 }
 
 // DeleteNestedField is a generic utility function that deletes
 // a string slice representing the path from the yaml doc
 func (r *obj[T1]) DeleteNestedField(fields ...string) error {
-	if r.o == nil {
-		return fmt.Errorf(errKubeObjectNotInitialized)
-	}
-	_, err := r.o.RemoveNestedField(fields...)
-	if err != nil {
-		return err
-	}
-	return nil
+	_, err := r.SubObject.RemoveNestedField(fields...)
+	return err
 }
