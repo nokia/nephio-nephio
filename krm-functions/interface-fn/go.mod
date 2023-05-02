@@ -10,7 +10,7 @@ require (
 	github.com/nephio-project/api v0.0.0-20230427222620-ebcbeb2c21e3
 	github.com/nephio-project/nephio v0.0.0-20230430115622-89c76dea2d39
 	github.com/nephio-project/nephio-controller-poc v0.0.2
-	github.com/nokia/k8s-ipam v0.0.4-0.20230501055521-9ff8ef41ff31
+	github.com/nokia/k8s-ipam v0.0.4-0.20230501191841-7d2b9f180b9c
 	k8s.io/api v0.27.1
 	k8s.io/apimachinery v0.27.1
 )
@@ -37,7 +37,6 @@ require (
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/kentik/patricia v1.2.0 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
-	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/monochromegane/go-gitignore v0.0.0-20200626010858-205db1a8cc00 // indirect
