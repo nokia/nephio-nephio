@@ -8,6 +8,7 @@ import (
 )
 
 func main() {
+
 	if err := fn.AsMain(fn.ResourceListProcessorFunc(mutator.Run)); err != nil {
 		os.Exit(1)
 	}

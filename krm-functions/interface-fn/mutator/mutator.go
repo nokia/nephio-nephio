@@ -1,303 +1,269 @@
 package mutator
 
 import (
+	"fmt"
 	"reflect"
 
 	"github.com/GoogleContainerTools/kpt-functions-sdk/go/fn"
 	nadv1 "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
-	ipamv1alpha1 "github.com/nokia/k8s-ipam/apis/ipam/v1alpha1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
+	nephioreqv1alpha1 "github.com/nephio-project/api/nf_requirements/v1alpha1"
+	infrav1alpha1 "github.com/nephio-project/nephio-controller-poc/apis/infra/v1alpha1"
+	"github.com/nephio-project/nephio/krm-functions/lib/condkptsdk"
+	"github.com/nephio-project/nephio/krm-functions/lib/kubeobject"
+	allocv1alpha1 "github.com/nokia/k8s-ipam/apis/alloc/common/v1alpha1"
+	ipamv1alpha1 "github.com/nokia/k8s-ipam/apis/alloc/ipam/v1alpha1"
+	vlanv1alpha1 "github.com/nokia/k8s-ipam/apis/alloc/vlan/v1alpha1"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	vlanlibv1alpha1 "github.com/nephio-project/nephio/krm-functions/lib/vlanalloc/v1alpha1"
 )
 
-type mutatorCtx struct {
-	resources []schema.GroupVersionKind
-	//inventory inventory.Inventory
+const defaultPODNetwork = "defaultPODNetwork"
 
-	//siteCode *string
-	//rl       kptrl.ResourceList
+type itfceFn struct {
+	sdk             condkptsdk.KptCondSDK
+	siteCode        string
+	masterInterface string
+	cniType         string
 }
-
-var ipamGVK = schema.GroupVersionKind{Group: ipamv1alpha1.GroupVersion.Group, Version: ipamv1alpha1.GroupVersion.Version, Kind: ipamv1alpha1.IPAllocationKind}
-
-// TO BE UPDATED with real vlan allocation CRD
-var vlanGVK = schema.GroupVersionKind{Group: ipamv1alpha1.GroupVersion.Group, Version: ipamv1alpha1.GroupVersion.Version, Kind: ipamv1alpha1.IPAllocationKind}
-var nadGVK = schema.GroupVersionKind{Group: nadv1.SchemeGroupVersion.Group, Version: nadv1.SchemeGroupVersion.Version, Kind: reflect.TypeOf(nadv1.NetworkAttachmentDefinition{}).Name()}
 
 func Run(rl *fn.ResourceList) (bool, error) {
-	// initialize the mutator Ctx
-	m := mutatorCtx{
-		resources: []schema.GroupVersionKind{ipamGVK, vlanGVK, nadGVK},
-		//inventory: inventory.New(),
-		//rl:        kptrl.New(rl),
+	myFn := itfceFn{}
+	var err error
+	myFn.sdk, err = condkptsdk.New(
+		rl,
+		&condkptsdk.Config{
+			For: corev1.ObjectReference{
+				APIVersion: nephioreqv1alpha1.GroupVersion.Identifier(),
+				Kind:       nephioreqv1alpha1.InterfaceKind,
+			},
+			Owns: map[corev1.ObjectReference]condkptsdk.ResourceKind{
+				{
+					APIVersion: nadv1.SchemeGroupVersion.Identifier(),
+					Kind:       reflect.TypeOf(nadv1.NetworkAttachmentDefinition{}).Name(),
+				}: condkptsdk.ChildRemoteCondition,
+				{
+					APIVersion: ipamv1alpha1.GroupVersion.Identifier(),
+					Kind:       ipamv1alpha1.IPAllocationKind,
+				}: condkptsdk.ChildRemote,
+				{
+					APIVersion: vlanv1alpha1.GroupVersion.Identifier(),
+					Kind:       vlanv1alpha1.VLANAllocationKind,
+				}: condkptsdk.ChildRemote,
+			},
+			Watch: map[corev1.ObjectReference]condkptsdk.WatchCallbackFn{
+				{
+					APIVersion: infrav1alpha1.GroupVersion.Identifier(),
+					Kind:       reflect.TypeOf(infrav1alpha1.ClusterContext{}).Name(),
+				}: myFn.ClusterContextCallbackFn,
+			},
+			PopulateOwnResourcesFn: myFn.desiredOwnedResourceList,
+			GenerateResourceFn:     myFn.updateItfceResource,
+		},
+	)
+	if err != nil {
+		rl.Results.ErrorE(err)
+		return false, nil
+	}
+	return myFn.sdk.Run()
+}
+
+// ClusterContextCallbackFn provides a callback for the cluster context
+// resources in the resourceList
+func (r *itfceFn) ClusterContextCallbackFn(o *fn.KubeObject) error {
+	clusterKOE, err := kubeobject.NewFromKubeObject[*infrav1alpha1.ClusterContext](o)
+	if err != nil {
+		return err
+	}
+	clusterContext, err := clusterKOE.GetGoStruct()
+	if err != nil {
+		return err
+	}
+	if clusterContext.Spec.SiteCode == nil {
+		return fmt.Errorf("mandatory field `siteCode` is missing from ClusterContext %q", clusterContext.Name)
+	}
+	if r.siteCode != "" && r.siteCode != *clusterContext.Spec.SiteCode {
+		return fmt.Errorf("multiple ClusterContext objects with confliciting `siteCode` fields found in the package")
+	}
+	r.siteCode = *clusterContext.Spec.SiteCode
+	if clusterContext.Spec.CNIConfig == nil {
+		return fmt.Errorf("mandatory field `cniConfig` is missing from ClusterContext %q", clusterContext.Name)
+	}
+	if (r.masterInterface != "" && clusterContext.Spec.CNIConfig.MasterInterface != r.masterInterface) ||
+		(r.cniType != "" && clusterContext.Spec.CNIConfig.CNIType != r.cniType) {
+		return fmt.Errorf("multiple ClusterContext objects with confliciting `cniConfig` fields found in the package")
+	}
+	r.masterInterface = clusterContext.Spec.CNIConfig.MasterInterface
+	r.cniType = clusterContext.Spec.CNIConfig.CNIType
+	return nil
+}
+
+// desiredOwnedResourceList returns with the list of all child KubeObjects
+// belonging to the parent Interface "for object"
+func (r *itfceFn) desiredOwnedResourceList(o *fn.KubeObject) (fn.KubeObjects, error) {
+	// resources contain the list of child resources
+	// belonging to the parent object
+	resources := fn.KubeObjects{}
+
+	itfceKOE, err := kubeobject.NewFromKubeObject[*nephioreqv1alpha1.Interface](o)
+	if err != nil {
+		return nil, err
 	}
 
-	m.initialize()
-	m.populate()
-	m.update()
+	itfce, err := itfceKOE.GetGoStruct()
+	if err != nil {
+		return nil, err
+	}
 
-	return true, nil
-}
+	// Nothing to be done in case the interface is attached to
+	// the default pod network since this is all handled in the
+	// k8s cluster via the CNI.
+	if itfce.Spec.NetworkInstance.Name == defaultPODNetwork {
+		return fn.KubeObjects{}, nil
+	}
 
-// initialize walks over the resource list and adds the existing resources in the inventory
-// -> kptfile - capture exisitng conditions in the package kptfile
-// -> nad - capture existing KRM in the package
-// -> ipAllocation - capture existing KRM in the package
-// -> vlanAllocation - capture existing KRM in the package
-// The clustercontext is captured
-func (r *mutatorCtx) initialize() {
-	/*
-					TO BE COMMENTED BACK IN
-		for _, o := range r.rl.GetObjects() {
-			if o.GetAPIVersion() == kptv1.KptFileGVK().GroupVersion().String() && o.GetKind() == kptv1.KptFileName {
-
-					kf := kptfilelibv1.NewMutator(o.String())
-					var err error
-					if _, err = kf.UnMarshal(); err != nil {
-						fn.Log("error unmarshal kptfile in initialize")
-						r.rl.AddResult(err, o)
-					}
-
-
-				// populate condition inventory
-
-					for _, gvk := range r.resources {
-						for _, c := range kf.GetConditions() {
-							if strings.Contains(c.Type, gvk.String()) {
-								r.inventory.AddExistingCondition(kptfilelibv1.GetGVKNFromConditionType(c.Type), &c)
-							}
-						}
-					}
-
-			}
-
-			if o.GetAPIVersion() == ipamv1alpha1.GroupVersion.Identifier() && o.GetKind() == ipamv1alpha1.IPAllocationKind {
-				// populate inventory index
-
-					r.inventory.AddExistingResource(&corev1.ObjectReference{
-						APIVersion: ipamv1alpha1.GroupVersion.Identifier(),
-						Kind:       ipamv1alpha1.IPAllocationKind,
-						Name:       o.GetName(),
-					}, o)
-
-			}
-
-				// TODO VLAN
-				//if o.GetAPIVersion() == ipamv1alpha1.GroupVersion.Identifier() && o.GetKind() == ipamv1alpha1.IPAllocationKind {
-				//	fn.Log("ipallocation", o.GetName())
-				//}
-
-			if o.GetAPIVersion() == nadv1.SchemeGroupVersion.Identifier() && o.GetKind() == reflect.TypeOf(nadv1.NetworkAttachmentDefinition{}).Name() {
-				// populate inventory index
-
-					r.inventory.AddExistingResource(&corev1.ObjectReference{
-						APIVersion: nadv1.SchemeGroupVersion.Identifier(),
-						Kind:       reflect.TypeOf(nadv1.NetworkAttachmentDefinition{}).Name(),
-						Name:       o.GetName(),
-					}, o)
-
-			}
-			if o.GetAPIVersion() == infrav1alpha1.SchemeBuilder.GroupVersion.Identifier() && o.GetKind() == reflect.TypeOf(infrav1alpha1.ClusterContext{}).Name() {
-
-					TO BE COMMENTED BACK IN
-					clusterContext := clusterctxtlibv1alpha1.NewMutator(o.String())
-					cluster, err := clusterContext.UnMarshal()
-					if err != nil {
-						r.rl.AddResult(err, o)
-					}
-					r.siteCode = cluster.Spec.SiteCode
-
-			}
+	// meta is the generic object meta attached to all derived child objects
+	meta := metav1.ObjectMeta{
+		Name: o.GetName(),
+	}
+	// When the CNIType is not set this is a loopback interface
+	if itfce.Spec.CNIType != "" {
+		if itfce.Spec.CNIType != nephioreqv1alpha1.CNIType(r.cniType) {
+			return nil, fmt.Errorf("cluster cniType not supported: cluster cniType: %s, interface cniType: %s", r.cniType, itfce.Spec.CNIType)
 		}
-	*/
-}
-
-// populate populates the inventory with the new resources
-// - nad, ipAllocation, vlanAllocation based on the requirements set in the interface CR(s)
-func (r *mutatorCtx) populate() {
-	/*
-		if r.siteCode != nil {
-			for _, o := range r.rl.GetObjects() {
-				if o.GetAPIVersion() == nephioreqv1alpha1.GroupVersion.Identifier() && o.GetKind() == nephioreqv1alpha1.InterfaceKind {
-							i := interfacelibv1alpha1.NewMutator(o.String())
-							itfce, err := i.UnMarshal()
-							if err != nil {
-								r.rl.AddResult(err, o)
-							}
-
-							// we assume right now that is the CNITYpe is not set this is a loopback interface
-							if itfce.Spec.CNIType != "" {
-								meta := metav1.ObjectMeta{
-									Name: o.GetName(),
-								}
-								// ip allocation type network
-								ipalloc := ipallocv1v1alpha1.NewGenerator(
-									meta,
-									ipamv1alpha1.IPAllocationSpec{
-										PrefixKind:      ipamv1alpha1.PrefixKindNetwork,
-										NetworkInstance: itfce.Spec.NetworkInstance.Name,
-										Selector: &metav1.LabelSelector{
-											MatchLabels: map[string]string{
-												//ipamv1alpha1.NephioSiteKey: *r.siteCode,
-												"nephio.org/site": *r.siteCode,
-											},
-										},
-									},
-								)
-								newObj, err := ipalloc.ParseKubeObject()
-								if err != nil {
-									r.rl.AddResult(err, o)
-								}
-								r.inventory.AddNewResource(&corev1.ObjectReference{
-									APIVersion: ipamGVK.GroupVersion().String(),
-									Kind:       ipamGVK.Kind,
-									Name:       o.GetName(),
-								}, newObj)
-								// allocate nad
-								nad := nadlibv1.NewGenerator(
-									meta,
-									nadv1.NetworkAttachmentDefinitionSpec{},
-								)
-								newObj, err = nad.ParseKubeObject()
-								if err != nil {
-									r.rl.AddResult(err, o)
-								}
-								r.inventory.AddNewResource(&corev1.ObjectReference{
-									APIVersion: nadGVK.GroupVersion().String(),
-									Kind:       nadGVK.Kind,
-									Name:       o.GetName(),
-								}, newObj)
-							} else {
-								// ip allocation type loopback
-								ipalloc := ipallocv1v1alpha1.NewGenerator(
-									metav1.ObjectMeta{
-										Name: o.GetName(),
-									},
-									ipamv1alpha1.IPAllocationSpec{
-										PrefixKind:      ipamv1alpha1.PrefixKindLoopback,
-										NetworkInstance: itfce.Spec.NetworkInstance.Name,
-										Selector: &metav1.LabelSelector{
-											MatchLabels: map[string]string{
-												//ipamv1alpha1.NephioSiteKey: *r.siteCode,
-												"nephio.org/site": *r.siteCode,
-											},
-										},
-									},
-								)
-								newObj, err := ipalloc.ParseKubeObject()
-								if err != nil {
-									r.rl.AddResult(err, o)
-								}
-								r.inventory.AddNewResource(&corev1.ObjectReference{
-									APIVersion: ipamGVK.GroupVersion().String(),
-									Kind:       ipamGVK.Kind,
-									Name:       o.GetName(),
-								}, newObj)
-							}
-
-							if itfce.Spec.AttachmentType == nephioreqv1alpha1.AttachmentTypeVLAN {
-								// vlan allocation
-							}
-
-				}
-			}
+		// add IP allocation of type network
+		o, err := r.getIPAllocation(meta, *itfce.Spec.NetworkInstance, ipamv1alpha1.PrefixKindNetwork)
+		if err != nil {
+			return nil, err
 		}
-	*/
+		resources = append(resources, o)
+
+		fn.Logf("itfce attachementType: %s\n", itfce.Spec.AttachmentType)
+		if itfce.Spec.AttachmentType == nephioreqv1alpha1.AttachmentTypeVLAN {
+			// add VLAN allocation
+			o, err := r.getVLANAllocation(meta)
+			if err != nil {
+				return nil, err
+			}
+			resources = append(resources, o)
+		}
+
+		// allocate nad
+		o, err = r.getNAD(meta)
+		if err != nil {
+			return nil, err
+		}
+		resources = append(resources, o)
+	} else {
+		// add IP allocation of type loopback
+		o, err := r.getIPAllocation(meta, *itfce.Spec.NetworkInstance, ipamv1alpha1.PrefixKindLoopback)
+		if err != nil {
+			return nil, err
+		}
+		resources = append(resources, o)
+	}
+	return resources, nil
 }
 
-// update performs a diff on the inventory and performs the respective operations
-// on the resources
-// create/delete/update conditions in the kptfile
-// create/update the CR, for delete the deletetimestamp is set on the CR such that the
-// respective controllers/functions take care of the resource deletion
-func (r *mutatorCtx) update() {
-	/*
-		// kptfile
+func (r *itfceFn) updateItfceResource(forObj *fn.KubeObject, objs fn.KubeObjects) (*fn.KubeObject, error) {
+	if forObj == nil {
+		return nil, fmt.Errorf("expected a for object but got nil")
+	}
+	itfceKOE, err := kubeobject.NewFromKubeObject[*nephioreqv1alpha1.Interface](forObj)
+	if err != nil {
+		return nil, err
+	}
+	itfce, err := itfceKOE.GetGoStruct()
+	if err != nil {
+		return nil, err
+	}
 
-			kf := kptfilelibv1.NewMutator(r.rl.GetObjects()[0].String())
-			var err error
-			if _, err = kf.UnMarshal(); err != nil {
-				fn.Log("error unmarshal kptfile")
-				r.rl.AddResult(err, r.rl.GetObjects()[0])
-			}
-
-
-		// perform a diff
-			diff, err := r.inventory.Diff()
+	ipallocs := objs.Where(fn.IsGroupVersionKind(ipamv1alpha1.IPAllocationGroupVersionKind))
+	for _, ipalloc := range ipallocs {
+		if ipalloc.GetName() == forObj.GetName() {
+			alloc, err := kubeobject.NewFromKubeObject[*ipamv1alpha1.IPAllocation](ipalloc)
 			if err != nil {
-				r.rl.AddResult(err, r.rl.GetObjects()[0])
+				return nil, err
 			}
-
-
-
-			if r.siteCode == nil {
-				// set deletion timestamp on all resources
-				for _, obj := range diff.DeleteObjs {
-					fn.Logf("create set condition: %s\n", kptfilelibv1.GetConditionType(&obj.Ref))
-					// set condition
-					kf.SetConditions(kptv1.Condition{
-						Type:   strings.ReplaceAll(kptfilelibv1.GetConditionType(&obj.Ref), "/", "_"),
-						Status: kptv1.ConditionFalse,
-						Reason: "cluster context has no site id",
-					})
-					// update the release timestamp
-					r.rl.SetObjectWithDeleteTimestamp(&obj.Obj)
-				}
-				return
-			} else {
-				for _, obj := range diff.DeleteConditions {
-					fn.Logf("delete condition: %s\n", kptfilelibv1.GetConditionType(&obj.Ref))
-					// delete condition
-					kf.DeleteCondition(strings.ReplaceAll(kptfilelibv1.GetConditionType(&obj.Ref), "/", "_"))
-				}
-				for _, obj := range diff.CreateObjs {
-					fn.Logf("create set condition: %s\n", kptfilelibv1.GetConditionType(&obj.Ref))
-					// create condition - add resource to resource list
-					kf.SetConditions(kptv1.Condition{
-						Type:   kptfilelibv1.GetConditionType(&obj.Ref),
-						Status: kptv1.ConditionFalse,
-						Reason: "create new resource",
-					})
-					// for NAD(s) we dont need to update the resource as the information is not available
-					// vlan/ip need to be allocated
-					if obj.Ref.APIVersion != nadGVK.GroupVersion().String() && obj.Ref.Name != nadGVK.Kind {
-						// add resource to resoucelist
-						r.rl.AddObject(&obj.Obj)
-					}
-				}
-				for _, obj := range diff.UpdateObjs {
-					fn.Logf("update set condition: %s\n", kptfilelibv1.GetConditionType(&obj.Ref))
-					// update condition - add resource to resource list
-					kf.SetConditions(kptv1.Condition{
-						Type:   strings.ReplaceAll(kptfilelibv1.GetConditionType(&obj.Ref), "/", "_"),
-						Status: kptv1.ConditionFalse,
-						Reason: "update existing resource",
-					})
-					// for NAD(s) we dont need to update the resource as the information is not available
-					// vlan/ip need to be allocated
-					if obj.Ref.APIVersion != nadGVK.GroupVersion().String() && obj.Ref.Name != nadGVK.Kind {
-						// update resource to resoucelist
-						r.rl.SetObject(&obj.Obj)
-					}
-
-				}
-				for _, obj := range diff.DeleteObjs {
-					fn.Logf("update set condition: %s\n", kptfilelibv1.GetConditionType(&obj.Ref))
-					// create condition - add resource to resource list
-					kf.SetConditions(kptv1.Condition{
-						Type:   strings.ReplaceAll(kptfilelibv1.GetConditionType(&obj.Ref), "/", "_"),
-						Status: kptv1.ConditionFalse,
-						Reason: "delete existing resource",
-					})
-					// update resource to resoucelist with delete Timestamp set
-					r.rl.SetObjectWithDeleteTimestamp(&obj.Obj)
-				}
-			}
-
-			kptfile, err := kf.ParseKubeObject()
+			allocGoStruct, err := alloc.GetGoStruct()
 			if err != nil {
-				fn.Log(err)
-				r.rl.AddResult(err, r.rl.GetObjects()[0])
+				return nil, err
 			}
-			r.rl.SetObject(kptfile)
-	*/
+			itfce.Status.IPAllocationStatus = &allocGoStruct.Status
+		}
+	}
+	vlanallocs := objs.Where(fn.IsGroupVersionKind(vlanv1alpha1.VLANAllocationGroupVersionKind))
+	for _, vlanalloc := range vlanallocs {
+		if vlanalloc.GetName() == forObj.GetName() {
+			alloc, err := vlanlibv1alpha1.NewFromKubeObject(vlanalloc)
+			if err != nil {
+				return nil, err
+			}
+			//alloc, err := ko.NewFromKubeObject[*vlanv1alpha1.VLANAllocation](vlanalloc)
+			//if err != nil {
+			//	return nil, err
+			//}
+			allocGoStruct, err := alloc.GetGoStruct()
+			if err != nil {
+				return nil, err
+			}
+			itfce.Status.VLANAllocationStatus = &allocGoStruct.Status
+		}
+	}
+	// set the status
+	err = itfceKOE.SetStatus(itfce.Status)
+	return &itfceKOE.KubeObject, err
+}
+
+func (r *itfceFn) getVLANAllocation(meta metav1.ObjectMeta) (*fn.KubeObject, error) {
+	alloc := vlanv1alpha1.BuildVLANAllocation(
+		meta,
+		vlanv1alpha1.VLANAllocationSpec{
+			VLANDatabase: corev1.ObjectReference{
+				Name: r.siteCode,
+			},
+		},
+		vlanv1alpha1.VLANAllocationStatus{},
+	)
+
+	return fn.NewFromTypedObject(alloc)
+}
+
+func (r *itfceFn) getIPAllocation(meta metav1.ObjectMeta, ni corev1.ObjectReference, kind ipamv1alpha1.PrefixKind) (*fn.KubeObject, error) {
+	alloc := ipamv1alpha1.BuildIPAllocation(
+		meta,
+		ipamv1alpha1.IPAllocationSpec{
+			Kind:            kind,
+			NetworkInstance: ni,
+			AllocationLabels: allocv1alpha1.AllocationLabels{
+				Selector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						allocv1alpha1.NephioSiteKey: r.siteCode,
+					},
+				},
+			},
+		},
+		ipamv1alpha1.IPAllocationStatus{},
+	)
+	return fn.NewFromTypedObject(alloc)
+}
+
+func (r *itfceFn) getNAD(meta metav1.ObjectMeta) (*fn.KubeObject, error) {
+	nad := BuildNetworkAttachmentDefinition(
+		meta,
+		nadv1.NetworkAttachmentDefinitionSpec{},
+	)
+	return fn.NewFromTypedObject(nad)
+}
+
+func BuildNetworkAttachmentDefinition(meta metav1.ObjectMeta, spec nadv1.NetworkAttachmentDefinitionSpec) *nadv1.NetworkAttachmentDefinition {
+	return &nadv1.NetworkAttachmentDefinition{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: nadv1.SchemeGroupVersion.Identifier(),
+			Kind:       reflect.TypeOf(nadv1.NetworkAttachmentDefinition{}).Name(),
+		},
+		ObjectMeta: meta,
+		Spec:       spec,
+	}
 }
