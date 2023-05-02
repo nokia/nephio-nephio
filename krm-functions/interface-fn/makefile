@@ -2,8 +2,6 @@ VERSION ?= latest
 REGISTRY ?= europe-docker.pkg.dev/srlinux/eu.gcr.io
 IMG ?= $(REGISTRY)/interface-fn:${VERSION}
 
-ROOTDIR=$(abspath $(CURDIR)/../..)
-
 .PHONY: all
 all: test 
 
@@ -17,7 +15,7 @@ test: fmt vet ## Run tests.
 	go test ./...
 
 docker-build:  ## Build docker images.
-	docker buildx build --load --tag  ${IMG} -f ./Dockerfile ${ROOTDIR}
+	docker buildx build --load --tag  ${IMG} -f ./Dockerfile .
 
 docker-push: ## Build docker images.
-	docker buildx build --push --tag  ${IMG} -f ./Dockerfile ${ROOTDIR}
+	docker buildx build --push --tag  ${IMG} -f ./Dockerfile .
