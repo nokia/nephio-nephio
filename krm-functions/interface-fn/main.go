@@ -4,12 +4,11 @@ import (
 	"os"
 
 	"github.com/GoogleContainerTools/kpt-functions-sdk/go/fn"
-	"github.com/nephio-project/nephio/krm-functions/interface-fn/mutator"
 )
 
 func main() {
 
-	if err := fn.AsMain(fn.ResourceListProcessorFunc(mutator.Run)); err != nil {
+	if err := fn.AsMain(fn.ResourceListProcessorFunc(Run)); err != nil {
 		os.Exit(1)
 	}
 }
