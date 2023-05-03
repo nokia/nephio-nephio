@@ -21,8 +21,8 @@ import (
 
 	"github.com/GoogleContainerTools/kpt-functions-sdk/go/fn"
 	function "github.com/nephio-project/nephio/krm-functions/ipam-fn/fn"
-	"github.com/nephio-project/nephio/krm-specializers/specializeroperator/controllers/config"
 	"github.com/nephio-project/nephio/krm-specializers/pkg/reconciler"
+	"github.com/nephio-project/nephio/krm-specializers/specializeroperator/controllers/config"
 	ipamv1alpha1 "github.com/nokia/k8s-ipam/apis/alloc/ipam/v1alpha1"
 	"github.com/nokia/k8s-ipam/pkg/proxy/clientproxy"
 	"github.com/nokia/k8s-ipam/pkg/proxy/clientproxy/ipam"

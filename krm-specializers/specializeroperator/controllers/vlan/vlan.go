@@ -21,8 +21,8 @@ import (
 
 	"github.com/GoogleContainerTools/kpt-functions-sdk/go/fn"
 	function "github.com/nephio-project/nephio/krm-functions/vlan-fn/fn"
-	"github.com/nephio-project/nephio/krm-specializers/specializeroperator/controllers/config"
 	"github.com/nephio-project/nephio/krm-specializers/pkg/reconciler"
+	"github.com/nephio-project/nephio/krm-specializers/specializeroperator/controllers/config"
 	vlanv1alpha1 "github.com/nokia/k8s-ipam/apis/alloc/vlan/v1alpha1"
 	"github.com/nokia/k8s-ipam/pkg/proxy/clientproxy"
 	"github.com/nokia/k8s-ipam/pkg/proxy/clientproxy/vlan"
@@ -34,7 +34,7 @@ func Setup(ctx context.Context, mgr ctrl.Manager, cfg config.SpecializerControll
 	r := &function.FnR{ClientProxy: vlan.New(
 		ctx, clientproxy.Config{Address: cfg.Address},
 	)}
-	
+
 	return reconciler.Setup(mgr, reconciler.Config{
 		For: corev1.ObjectReference{
 			APIVersion: vlanv1alpha1.SchemeBuilder.GroupVersion.Identifier(),
