@@ -123,7 +123,7 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 			r.l.Error(err, "cannot unmarshal kptfile")
 			return ctrl.Result{}, nil
 		}
-		pr.Status.Conditions = getPorchCondiitons(kptf.GetConditions())
+		pr.Status.Conditions = getPorchConditions(kptf.GetConditions())
 		if err = r.porchClient.Update(ctx, prr); err != nil {
 			return ctrl.Result{}, err
 		}

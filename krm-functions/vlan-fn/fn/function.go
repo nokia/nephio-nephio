@@ -14,7 +14,7 @@
  limitations under the License.
 */
 
-package function
+package fn
 
 import (
 	"context"

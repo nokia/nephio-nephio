@@ -23,7 +23,8 @@ import (
 	porchv1alpha1 "github.com/GoogleContainerTools/kpt/porch/api/porch/v1alpha1"
 )
 
-func getPorchCondiitons(cs []kptv1.Condition) []porchv1alpha1.Condition {
+// getPorchConditions converts kpt conditions to porch conditions
+func getPorchConditions(cs []kptv1.Condition) []porchv1alpha1.Condition {
 	var prConditions []porchv1alpha1.Condition
 	for _, c := range cs {
 		prConditions = append(prConditions, porchv1alpha1.Condition{
