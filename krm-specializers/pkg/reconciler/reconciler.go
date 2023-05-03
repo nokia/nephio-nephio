@@ -20,9 +20,9 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/GoogleContainerTools/kpt-functions-sdk/go/fn"
 	porchv1alpha1 "github.com/GoogleContainerTools/kpt/porch/api/porch/v1alpha1"
 	"github.com/go-logr/logr"
-	"github.com/nephio-project/nephio/krm-functions/function"
 	kptfilelibv1 "github.com/nephio-project/nephio/krm-functions/lib/kptfile/v1"
 	"github.com/nephio-project/nephio/krm-functions/lib/kptrl"
 	"github.com/nephio-project/nephio/krm-specializers/pkg/resource"
@@ -37,7 +37,7 @@ import (
 type Config struct {
 	For         corev1.ObjectReference
 	PorchClient client.Client
-	KRMfunction function.Function
+	KRMfunction fn.ResourceListProcessor
 }
 
 // +kubebuilder:rbac:groups=porch.kpt.dev,resources=packagerevisions,verbs=get;list;watch;create;update;patch;delete
@@ -63,7 +63,7 @@ type reconciler struct {
 	client.Client
 	For         corev1.ObjectReference
 	porchClient client.Client
-	krmfn       function.Function
+	krmfn       fn.ResourceListProcessor
 
 	l logr.Logger
 }
@@ -100,7 +100,7 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		}
 
 		// run the function SDK
-		_, err = r.krmfn.Run(rl)
+		_, err = r.krmfn.Process(rl)
 		if err != nil {
 			r.l.Error(err, "function run failed")
 			// TBD if we need to return here + check if kptfile is set

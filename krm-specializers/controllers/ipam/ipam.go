@@ -19,6 +19,7 @@ package ipam
 import (
 	"context"
 
+	"github.com/GoogleContainerTools/kpt-functions-sdk/go/fn"
 	function "github.com/nephio-project/nephio/krm-functions/ipam-fn"
 	"github.com/nephio-project/nephio/krm-specializers/controllers/config"
 	"github.com/nephio-project/nephio/krm-specializers/pkg/reconciler"
@@ -30,14 +31,17 @@ import (
 )
 
 func Setup(ctx context.Context, mgr ctrl.Manager, cfg config.SpecializerControllerConfig) error {
+	r := &function.FnR{ClientProxy: ipam.New(
+		ctx, clientproxy.Config{Address: cfg.Address},
+	)}
+
 	return reconciler.Setup(mgr, reconciler.Config{
 		For: corev1.ObjectReference{
 			APIVersion: ipamv1alpha1.SchemeBuilder.GroupVersion.Identifier(),
 			Kind:       ipamv1alpha1.IPAllocationKind,
 		},
 		PorchClient: cfg.PorchClient,
-		KRMfunction: function.New(ipam.New(ctx, clientproxy.Config{
-			Address: cfg.Address,
-		})),
+		KRMfunction: fn.ResourceListProcessorFunc(
+			r.Run),
 	})
 }
