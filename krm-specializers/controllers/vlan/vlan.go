@@ -20,7 +20,7 @@ import (
 	"context"
 
 	"github.com/GoogleContainerTools/kpt-functions-sdk/go/fn"
-	function "github.com/nephio-project/nephio/krm-functions/vlan-fn"
+	function "github.com/nephio-project/nephio/krm-functions/vlan-fn/fn"
 	"github.com/nephio-project/nephio/krm-specializers/controllers/config"
 	"github.com/nephio-project/nephio/krm-specializers/pkg/reconciler"
 	vlanv1alpha1 "github.com/nokia/k8s-ipam/apis/alloc/vlan/v1alpha1"
