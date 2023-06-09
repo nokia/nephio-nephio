@@ -32,6 +32,7 @@ import (
 	vlanv1alpha1 "github.com/nokia/k8s-ipam/apis/resource/vlan/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/kustomize/kyaml/kio/filters"
 )
 
 const defaultPODNetwork = "default"
@@ -307,8 +308,11 @@ func (f *itfceFn) getAnnotationsWithvlanClaimName(itfce *nephioreqv1alpha1.Inter
 
 func getAnnotations(annotations map[string]string) map[string]string {
 	a := map[string]string{}
+	// retain local config from the parent resource
 	for k, v := range annotations {
-		a[k] = v
+		if k == filters.LocalConfigAnnotation {
+			a[k] = v
+		}
 	}
 	if owner, ok := annotations[condkptsdk.SpecializerPurpose]; ok {
 		a[condkptsdk.SpecializerPurpose] = owner
