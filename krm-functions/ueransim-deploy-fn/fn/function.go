@@ -31,7 +31,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 const NetworksAnnotation = "k8s.v1.cni.cncf.io/networks"
@@ -174,26 +173,28 @@ func (f *deployFn) updateResource(deployObj *fn.KubeObject, objs fn.KubeObjects)
 		}
 	}
 	// add service with the additional information
-	serviceKo, err := buildServiceKubeObject(metav1.ObjectMeta{
-		Name:      "gnb-service",
-		Namespace: deploy.Namespace,
-		Labels:    getLabels(),
-	}, corev1.ServiceSpec{
-		Type: corev1.ServiceTypeClusterIP,
-		Ports: []corev1.ServicePort{
-			{
-				Name:       "gnb-ue",
-				Protocol:   corev1.ProtocolUDP,
-				Port:       4997,
-				TargetPort: intstr.IntOrString{IntVal: 4097},
+	/*
+		serviceKo, err := buildServiceKubeObject(metav1.ObjectMeta{
+			Name:      "gnb-service",
+			Namespace: deploy.Namespace,
+			Labels:    getLabels(),
+		}, corev1.ServiceSpec{
+			Type: corev1.ServiceTypeClusterIP,
+			Ports: []corev1.ServicePort{
+				{
+					Name:       "gnb-ue",
+					Protocol:   corev1.ProtocolUDP,
+					Port:       4997,
+					TargetPort: intstr.IntOrString{IntVal: 4097},
+				},
 			},
-		},
-		Selector: getSelectorLabels(),
-	})
-	if err != nil {
-		return nil, err
-	}
-	resources = append(resources, serviceKo)
+			Selector: getSelectorLabels(),
+		})
+		if err != nil {
+			return nil, err
+		}
+		resources = append(resources, serviceKo)
+	*/
 
 	return resources, nil
 
@@ -325,6 +326,7 @@ func buildConfigMapKubeObject(meta metav1.ObjectMeta, key, value string) (*fn.Ku
 	return fn.NewFromTypedObject(o)
 }
 
+/*
 func buildServiceKubeObject(meta metav1.ObjectMeta, spec corev1.ServiceSpec) (*fn.KubeObject, error) {
 	o := &corev1.Service{
 		TypeMeta: metav1.TypeMeta{
@@ -336,6 +338,7 @@ func buildServiceKubeObject(meta metav1.ObjectMeta, spec corev1.ServiceSpec) (*f
 	}
 	return fn.NewFromTypedObject(o)
 }
+*/
 
 func getSelectorLabels() map[string]string {
 	return map[string]string{
