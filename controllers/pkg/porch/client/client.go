@@ -42,7 +42,7 @@ func CreateClient(config *rest.Config) (client.Client, error) {
 		return nil, err
 	}
 
-	return c, nil
+	return WrapClient(c), nil
 }
 
 // controller-runtime does not support sub-resources so we use REST client directly.

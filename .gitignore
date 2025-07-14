@@ -30,3 +30,6 @@ coverage_unit.html
 *-results.html
 
 .sonarlint*
+
+# IDEs
+.idea/
