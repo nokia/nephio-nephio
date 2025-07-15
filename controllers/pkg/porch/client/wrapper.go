@@ -3,7 +3,6 @@ package client
 import (
 	"context"
 	"fmt"
-	"path/filepath"
 	"reflect"
 	gort "runtime"
 
@@ -37,7 +36,6 @@ func getKind(obj runtime.Object) string {
 func getCaller() string {
 	_, file, line, ok := gort.Caller(2)
 	if ok {
-		file = filepath.Base(file)
 		return fmt.Sprintf("%s:%d", file, line)
 	}
 
