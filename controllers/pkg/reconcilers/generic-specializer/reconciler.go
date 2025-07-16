@@ -299,12 +299,8 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		log.Info("generic specializer root kptfile", "packageName", pr.Spec.PackageName, "repository", pr.Spec.RepositoryName, "kptfile", kptfile)
 
 		for _, o := range rl.Items {
-			clearAnnotations(o,
-				kioutil.LegacyIndexAnnotation, //nolint:staticcheck
-				kioutil.LegacyPathAnnotation,  //nolint:staticcheck
-				kioutil.IndexAnnotation,
-				kioutil.PathAnnotation,
-			)
+			path := o.PathAnnotation()
+			prr.Spec.Resources[path] = clearAnnotations(o).String()
 		}
 
 		if err = r.porchClient.Update(ctx, prr); err != nil {
@@ -317,7 +313,14 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 }
 
 // TODO: this has already been implemented in porch's vendored in version of the kpt-functions-sdk
-func clearAnnotations(ko *fn.KubeObject, annotations ...string) {
+func clearAnnotations(ko *fn.KubeObject) *fn.KubeObject {
+	annotations := []string{
+		kioutil.LegacyIndexAnnotation, //nolint:staticcheck
+		kioutil.LegacyPathAnnotation,  //nolint:staticcheck
+		kioutil.IndexAnnotation,
+		kioutil.PathAnnotation,
+	}
+
 	currentAnnotations := ko.GetAnnotations()
 	if currentAnnotations != nil {
 		for _, annotation := range annotations {
@@ -325,6 +328,8 @@ func clearAnnotations(ko *fn.KubeObject, annotations ...string) {
 		}
 		_ = ko.SetNestedField(currentAnnotations, "metadata", "annotations")
 	}
+
+	return ko
 }
 
 func (r *reconciler) getClusterName(ctx context.Context, workloadClusterObjs fn.KubeObjects) string {
